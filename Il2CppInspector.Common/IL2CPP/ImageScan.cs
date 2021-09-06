@@ -134,7 +134,12 @@ namespace Il2CppInspector
                 // if this changes we'll have to get smarter about disambiguating these two.
                 var cr = Image.ReadMappedObject<Il2CppCodeRegistration>(codeRegistration);
 
-                if (Image.Version == 24.2 && cr.interopDataCount == 0) {
+                if (Image.Version == 24.2 && cr.reversePInvokeWrapperCount > 0x30000)
+                {
+                    Image.Version = 24.4;
+                    codeRegistration -= ptrSize * 3;
+                    Console.WriteLine($"Change il2cpp version to: {Image.Version}");
+                } else if (Image.Version == 24.2 && cr.interopDataCount == 0) {
                     Image.Version = 24.3;
                     codeRegistration -= ptrSize * 2; // two extra words for WindowsRuntimeFactory
                 }

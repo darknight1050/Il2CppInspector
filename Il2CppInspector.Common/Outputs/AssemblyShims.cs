@@ -19,7 +19,8 @@ namespace Il2CppInspector.Outputs
     public static class dnlibExtensions
     {
         // Add a default parameterless constructor that calls a specified base constructor
-        public static MethodDef AddDefaultConstructor(this TypeDef type, IMethod @base) {
+        public static MethodDef AddDefaultConstructor(this TypeDef type, IMethod @base)
+        {
             var ctor = new MethodDefUser(".ctor", MethodSig.CreateInstance(type.Module.CorLibTypes.Void),
                 MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
 
@@ -35,8 +36,8 @@ namespace Il2CppInspector.Outputs
 
         // Add custom attribute to item with named property arguments
         // 'module' is the module that owns 'type'; type.Module may still be null when this is called
-        public static CustomAttribute AddAttribute(this IHasCustomAttribute def, ModuleDef module, TypeDef attrTypeDef, params (string prop, object value)[] args) {
-
+        public static CustomAttribute AddAttribute(this IHasCustomAttribute def, ModuleDef module, TypeDef attrTypeDef, params (string prop, object value)[] args)
+        {
             // If SuppressMetadata is set, our own attributes will never be generated so attrTypeDef will be null
             if (attrTypeDef == null)
                 return null;
@@ -66,6 +67,7 @@ namespace Il2CppInspector.Outputs
 
         // Our custom attributes
         private TypeDef addressAttribute;
+
         private TypeDef fieldOffsetAttribute;
         private TypeDef staticFieldOffsetAttribute;
         private TypeDef attributeAttribute;
@@ -85,7 +87,8 @@ namespace Il2CppInspector.Outputs
         public AssemblyShims(TypeModel model) => this.model = model;
 
         // Generate base DLL with our custom types
-        private ModuleDef CreateBaseAssembly() {
+        private ModuleDef CreateBaseAssembly()
+        {
             // Create DLL with our custom types
             var module = CreateAssembly("Il2CppInspector.dll");
 
@@ -99,7 +102,8 @@ namespace Il2CppInspector.Outputs
             var stringField = new FieldSig(module.CorLibTypes.String);
 
             // Create a type deriving from System.Attribute and add it to the assembly
-            TypeDefUser createAttribute(string name) {
+            TypeDefUser createAttribute(string name)
+            {
                 var attribute = new TypeDefUser(rootNamespace, name, attributeTypeRef);
                 attribute.Attributes = TypeAttributes.Public | TypeAttributes.BeforeFieldInit;
                 module.Types.Add(attribute);
@@ -145,7 +149,8 @@ namespace Il2CppInspector.Outputs
         }
 
         // Create a new DLL assembly definition
-        private ModuleDefUser CreateAssembly(string name) {
+        private ModuleDefUser CreateAssembly(string name)
+        {
             // Create module
             var module = new ModuleDefUser(name) { Kind = ModuleKind.Dll };
 
@@ -157,17 +162,20 @@ namespace Il2CppInspector.Outputs
             asm.Modules.Add(module);
             return module;
         }
- 
+
         // Generate type recursively with all nested types
-        private TypeDefUser CreateType(ModuleDef module, TypeInfo type) {
+        private TypeDefUser CreateType(ModuleDef module, TypeInfo type)
+        {
             // Initialize with base class
-            var mType = new TypeDefUser(type.Namespace, type.BaseName, GetTypeRef(module, type.BaseType)) {
-                Attributes = (TypeAttributes) type.Attributes
+            var mType = new TypeDefUser(type.Namespace, type.BaseName, GetTypeRef(module, type.BaseType))
+            {
+                Attributes = (TypeAttributes)type.Attributes
             };
 
             // Generic parameters
-            foreach (var gp in type.GenericTypeParameters) {
-                var p = new GenericParamUser((ushort) gp.GenericParameterPosition, (GenericParamAttributes) gp.GenericParameterAttributes, gp.Name);
+            foreach (var gp in type.GenericTypeParameters)
+            {
+                var p = new GenericParamUser((ushort)gp.GenericParameterPosition, (GenericParamAttributes)gp.GenericParameterAttributes, gp.Name);
 
                 // Generic constraints (types and interfaces)
                 foreach (var c in gp.GetGenericParameterConstraints())
@@ -215,10 +223,11 @@ namespace Il2CppInspector.Outputs
         }
 
         // Add a field to a type
-        private FieldDef AddField(ModuleDef module, TypeDef mType, FieldInfo field) {
+        private FieldDef AddField(ModuleDef module, TypeDef mType, FieldInfo field)
+        {
             var s = new FieldSig(GetTypeSig(module, field.FieldType));
 
-            var mField = new FieldDefUser(field.Name, s, (FieldAttributes) field.Attributes);
+            var mField = new FieldDefUser(field.Name, s, (FieldAttributes)field.Attributes);
 
             // Default value
             if (field.HasDefaultValue)
@@ -229,8 +238,9 @@ namespace Il2CppInspector.Outputs
                 mField.AddAttribute(module, metadataOffsetAttribute, ("Offset", $"0x{field.DefaultValueMetadataAddress:X8}"));
 
             // Static array initializer preview
-            if (field.HasFieldRVA) {
-                var preview = model.Package.Metadata.ReadBytes((long) field.DefaultValueMetadataAddress, 8);
+            if (field.HasFieldRVA)
+            {
+                var preview = model.Package.Metadata.ReadBytes((long)field.DefaultValueMetadataAddress, 8);
                 var previewText = string.Join(" ", preview.Select(b => $"{b:x2}"));
 
                 mField.AddAttribute(module, metadataPreviewAttribute, ("Data", previewText));
@@ -238,7 +248,12 @@ namespace Il2CppInspector.Outputs
 
             // Field offset
             if (!field.IsStatic)
-                mField.AddAttribute(module, fieldOffsetAttribute, ("Offset", $"0x{field.Offset:X2}"));
+            {
+                // Enums have an issue where they are seemingly boxed for no good reason, thus their field offset is invalid.
+                // This fixes that.
+                var correctedOffset = mType.IsEnum && field.Offset > 0 ? field.Offset - 0x10 : field.Offset;
+                mField.AddAttribute(module, fieldOffsetAttribute, ("Offset", $"0x{correctedOffset:X2}"));
+            }
             else if (!field.IsLiteral)
                 mField.AddAttribute(module, staticFieldOffsetAttribute, ("Offset", $"0x{field.Offset:X2}"));
 
@@ -247,14 +262,15 @@ namespace Il2CppInspector.Outputs
 
             // Add custom attribute attributes
             foreach (var ca in field.CustomAttributes)
-            AddCustomAttribute(module, mField, ca);
+                AddCustomAttribute(module, mField, ca);
 
             mType.Fields.Add(mField);
             return mField;
         }
 
         // Add a property to a type
-        private PropertyDef AddProperty(ModuleDef module, TypeDef mType, PropertyInfo prop) {
+        private PropertyDef AddProperty(ModuleDef module, TypeDef mType, PropertyInfo prop)
+        {
             PropertySig s;
 
             // Static or instance
@@ -263,7 +279,7 @@ namespace Il2CppInspector.Outputs
             else
                 s = PropertySig.CreateInstance(GetTypeSig(module, prop.PropertyType));
 
-            var mProp = new PropertyDefUser(prop.Name, s, (PropertyAttributes) prop.Attributes);
+            var mProp = new PropertyDefUser(prop.Name, s, (PropertyAttributes)prop.Attributes);
 
             mProp.GetMethod = AddMethod(module, mType, prop.GetMethod);
             mProp.SetMethod = AddMethod(module, mType, prop.SetMethod);
@@ -283,8 +299,9 @@ namespace Il2CppInspector.Outputs
         }
 
         // Add an event to a type
-        private EventDef AddEvent(ModuleDef module, TypeDef mType, EventInfo evt) {
-            var mEvent = new EventDefUser(evt.Name, GetTypeRef(module, evt.EventHandlerType), (EventAttributes) evt.Attributes);
+        private EventDef AddEvent(ModuleDef module, TypeDef mType, EventInfo evt)
+        {
+            var mEvent = new EventDefUser(evt.Name, GetTypeRef(module, evt.EventHandlerType), (EventAttributes)evt.Attributes);
 
             mEvent.AddMethod = AddMethod(module, mType, evt.AddMethod);
             mEvent.RemoveMethod = AddMethod(module, mType, evt.RemoveMethod);
@@ -303,14 +320,15 @@ namespace Il2CppInspector.Outputs
         }
 
         // Add a method to a type
-        private MethodDef AddMethod(ModuleDef module, TypeDef mType, MethodBase method) {
+        private MethodDef AddMethod(ModuleDef module, TypeDef mType, MethodBase method)
+        {
             // Undefined method
             if (method == null)
                 return null;
 
             // Return type and parameter signature
             MethodSig s;
-            
+
             // Static or instance
             if (method.IsStatic)
                 s = MethodSig.CreateStatic(
@@ -319,16 +337,17 @@ namespace Il2CppInspector.Outputs
                     .ToArray());
             else
                 s = MethodSig.CreateInstance(
-                    method is MethodInfo mi? GetTypeSig(module, mi.ReturnType) : module.CorLibTypes.Void,
+                    method is MethodInfo mi ? GetTypeSig(module, mi.ReturnType) : module.CorLibTypes.Void,
                     method.DeclaredParameters.Select(p => GetTypeSig(module, p.ParameterType))
                     .ToArray());
 
             // Definition
-            var mMethod = new MethodDefUser(method.Name, s, (MethodImplAttributes) method.MethodImplementationFlags, (MethodAttributes) method.Attributes);
+            var mMethod = new MethodDefUser(method.Name, s, (MethodImplAttributes)method.MethodImplementationFlags, (MethodAttributes)method.Attributes);
 
             // Generic type parameters
-            foreach (var gp in method.GetGenericArguments()) {
-                var p = new GenericParamUser((ushort) gp.GenericParameterPosition, (GenericParamAttributes) gp.GenericParameterAttributes, gp.Name);
+            foreach (var gp in method.GetGenericArguments())
+            {
+                var p = new GenericParamUser((ushort)gp.GenericParameterPosition, (GenericParamAttributes)gp.GenericParameterAttributes, gp.Name);
 
                 // Generic constraints (types and interfaces)
                 foreach (var c in gp.GetGenericParameterConstraints())
@@ -338,8 +357,9 @@ namespace Il2CppInspector.Outputs
             }
 
             // Parameter names and default values
-            foreach (var param in method.DeclaredParameters) {
-                var p = new ParamDefUser(param.Name, (ushort) (param.Position + 1), (ParamAttributes) param.Attributes);
+            foreach (var param in method.DeclaredParameters)
+            {
+                var p = new ParamDefUser(param.Name, (ushort)(param.Position + 1), (ParamAttributes)param.Attributes);
 
                 if (param.HasDefaultValue)
                     p.Constant = new ConstantUser(param.DefaultValue);
@@ -358,7 +378,8 @@ namespace Il2CppInspector.Outputs
             // Everything that's not extern, abstract or a delegate type should have a method body
             if ((method.Attributes & System.Reflection.MethodAttributes.PinvokeImpl) == 0
                 && method.DeclaringType.BaseType?.FullName != "System.MulticastDelegate"
-                && !method.IsAbstract) {
+                && !method.IsAbstract)
+            {
                 mMethod.Body = new CilBody();
                 var inst = mMethod.Body.Instructions;
 
@@ -367,7 +388,8 @@ namespace Il2CppInspector.Outputs
                     inst.Add(OpCodes.Ret.ToInstruction());
 
                 // Return default for value type or enum
-                else if (mMethod.ReturnType.IsValueType || ((MethodInfo) method).ReturnType.IsEnum) {
+                else if (mMethod.ReturnType.IsValueType || ((MethodInfo)method).ReturnType.IsEnum)
+                {
                     var result = new Local(mMethod.ReturnType);
                     mMethod.Body.Variables.Add(result);
 
@@ -379,7 +401,8 @@ namespace Il2CppInspector.Outputs
                 }
 
                 // Return null for reference types
-                else {
+                else
+                {
                     inst.Add(OpCodes.Ldnull.ToInstruction());
                     inst.Add(OpCodes.Ret.ToInstruction());
                 }
@@ -389,8 +412,9 @@ namespace Il2CppInspector.Outputs
             mMethod.AddAttribute(module, tokenAttribute, ("Token", $"0x{method.MetadataToken:X8}"));
 
             // Add method pointer attribute
-            if (method.VirtualAddress.HasValue) {
-                var args = new List<(string,object)> {
+            if (method.VirtualAddress.HasValue)
+            {
+                var args = new List<(string, object)> {
                         ("RVA", (method.VirtualAddress.Value.Start - model.Package.BinaryImage.ImageBase).ToAddressString()),
                         ("Offset", string.Format("0x{0:X}", model.Package.BinaryImage.MapVATR(method.VirtualAddress.Value.Start))),
                         ("VA", method.VirtualAddress.Value.Start.ToAddressString())
@@ -411,7 +435,8 @@ namespace Il2CppInspector.Outputs
         }
 
         // Add a custom attributes attribute to an item, or the attribute itself if it is in our direct apply list
-        private CustomAttribute AddCustomAttribute(ModuleDef module, IHasCustomAttribute def, CustomAttributeData ca) {
+        private CustomAttribute AddCustomAttribute(ModuleDef module, IHasCustomAttribute def, CustomAttributeData ca)
+        {
             if (directApplyAttributes.TryGetValue(ca.AttributeType, out var attrDef) && attrDef != null)
                 return def.AddAttribute(module, attrDef);
 
@@ -423,7 +448,8 @@ namespace Il2CppInspector.Outputs
         }
 
         // Generate type recursively with all nested types and add to module
-        private TypeDefUser AddType(ModuleDef module, TypeInfo type) {
+        private TypeDefUser AddType(ModuleDef module, TypeInfo type)
+        {
             var mType = CreateType(module, type);
 
             // Add to attribute apply list if we're looking for it
@@ -444,7 +470,8 @@ namespace Il2CppInspector.Outputs
             => module.Import(GetTypeSigImpl(module, type));
 
         // Convert Il2CppInspector TypeInfo into type signature
-        private TypeSig GetTypeSigImpl(ModuleDef module, TypeInfo type) {
+        private TypeSig GetTypeSigImpl(ModuleDef module, TypeInfo type)
+        {
             if (type == null)
                 return null;
 
@@ -477,7 +504,7 @@ namespace Il2CppInspector.Outputs
 
             // Get reference to type; use nested type as resolution scope if applicable
             var typeSig = new TypeRefUser(typeOwnerModule, type.Namespace, type.BaseName,
-                type.DeclaringType != null? (IResolutionScope) GetTypeRef(module, type.DeclaringType).ScopeType : typeOwnerModuleRef)
+                type.DeclaringType != null ? (IResolutionScope)GetTypeRef(module, type.DeclaringType).ScopeType : typeOwnerModuleRef)
                 .ToTypeSig();
 
             // Non-generic type (CLASS / VALUETYPE)
@@ -494,8 +521,8 @@ namespace Il2CppInspector.Outputs
         }
 
         // Generate and save all DLLs
-        public void Write(string outputPath, EventHandler<string> statusCallback = null) {
-
+        public void Write(string outputPath, EventHandler<string> statusCallback = null)
+        {
             // Create folder for DLLs
             Directory.CreateDirectory(outputPath);
 
@@ -504,20 +531,22 @@ namespace Il2CppInspector.Outputs
             directApplyAttributes = model.TypesByDefinitionIndex
                 .Where(t => t.BaseType?.FullName == "System.Attribute"
                         && !t.DeclaredFields.Any() && !t.DeclaredProperties.Any())
-                .ToDictionary(t => t, t => (TypeDef) null);
+                .ToDictionary(t => t, t => (TypeDef)null);
 
             // Generate blank assemblies
             // We have to do this before adding anything else so we can reference every module
             modules.Clear();
 
-            foreach (var asm in model.Assemblies) {
+            foreach (var asm in model.Assemblies)
+            {
                 // Create assembly and add primary module to list
                 var module = CreateAssembly(asm.ShortName);
                 modules.Add(asm, module);
             }
 
             // Generate our custom types assembly (relies on mscorlib.dll being added above)
-            if (!SuppressMetadata) {
+            if (!SuppressMetadata)
+            {
                 var baseDll = CreateBaseAssembly();
 
                 // Write base assembly to disk
@@ -525,7 +554,8 @@ namespace Il2CppInspector.Outputs
             }
 
             // Add assembly custom attribute attributes (must do this after all assemblies are created due to type referencing)
-            foreach (var asm in model.Assemblies) {
+            foreach (var asm in model.Assemblies)
+            {
                 var module = modules[asm];
 
                 foreach (var ca in asm.CustomAttributes)
@@ -537,14 +567,16 @@ namespace Il2CppInspector.Outputs
             }
 
             // Add all types
-            foreach (var asm in model.Assemblies) {
+            foreach (var asm in model.Assemblies)
+            {
                 statusCallback?.Invoke(this, "Preparing " + asm.ShortName);
                 foreach (var type in asm.DefinedTypes.Where(t => !t.IsNested))
                     AddType(modules[asm], type);
             }
 
             // Write all assemblies to disk
-            foreach (var asm in modules.Values) {
+            foreach (var asm in modules.Values)
+            {
                 statusCallback?.Invoke(this, "Generating " + asm.Name);
                 asm.Write(Path.Combine(outputPath, asm.Name));
             }

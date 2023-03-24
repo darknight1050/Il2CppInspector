@@ -282,6 +282,10 @@ namespace Il2CppInspector
             // Build list of custom attribute generators
             if (Version < 27)
                 CustomAttributeGenerators = Binary.CustomAttributeGenerators;
+            
+            // v29 removes these
+            else if (Version >= 29)
+                CustomAttributeGenerators = new ulong[] { };
 
             else {
                 var cagCount = Images.Sum(i => i.customAttributeCount);

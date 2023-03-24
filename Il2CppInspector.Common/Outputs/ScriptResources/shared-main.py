@@ -66,9 +66,9 @@ def ProcessJSON(jsonData):
 	for d in jsonData['methodInvokers']:
 		DefineCppFunction(d)
 
-	# String literals for version >= 19
+	# String literals for 19 <= version <= 29
 	print('Processing string literals')
-	if 'virtualAddress' in jsonData['stringLiterals'][0]:
+	if len(jsonData['stringLiterals']) > 0 and 'virtualAddress' in jsonData['stringLiterals'][0]:
 		for d in jsonData['stringLiterals']:
 			DefineString(d)
 

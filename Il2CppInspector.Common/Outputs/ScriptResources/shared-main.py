@@ -49,28 +49,44 @@ def ProcessJSON(jsonData):
 	# Method definitions
 	print('Processing method definitions')
 	for d in jsonData['methodDefinitions']:
-		DefineILMethod(d)
+		try:
+  			DefineILMethod(d)
+		except:
+			print("methodDefinitions: An exception occurred")
+
 	
 	# Constructed generic methods
 	print('Processing constructed generic methods')
 	for d in jsonData['constructedGenericMethods']:
-		DefineILMethod(d)
+		try:
+  			DefineILMethod(d)
+		except:
+			print("constructedGenericMethods: An exception occurred")
 
 	# Custom attributes generators
 	print('Processing custom attributes generators')
 	for d in jsonData['customAttributesGenerators']:
-		DefineCppFunction(d)
+		try:
+  			DefineCppFunction(d)
+		except:
+			print("customAttributesGenerators: An exception occurred")
 	
 	# Method.Invoke thunks
 	print('Processing Method.Invoke thunks')
 	for d in jsonData['methodInvokers']:
-		DefineCppFunction(d)
+		try:
+  			DefineCppFunction(d)
+		except:
+			print("methodInvokers: An exception occurred")
 
-	# String literals for 19 <= version <= 29
+	# String literals for version >= 19
 	print('Processing string literals')
 	if len(jsonData['stringLiterals']) > 0 and 'virtualAddress' in jsonData['stringLiterals'][0]:
 		for d in jsonData['stringLiterals']:
-			DefineString(d)
+			try:
+  				DefineString(d)
+			except:
+				print("stringLiterals: An exception occurred")
 
 	# String literals for version < 19
 	else:
@@ -78,22 +94,34 @@ def ProcessJSON(jsonData):
 		for d in jsonData['stringLiterals']:
 			litDecl += "  " + AsUTF8(d['name']) + ",\n"
 		litDecl += '};\n'
-		DefineCode(litDecl)
+		try:
+  			DefineCode(litDecl)
+		except:
+			print("stringLiterals: An exception occurred")
 	
 	# Il2CppClass (TypeInfo) pointers
 	print('Processing Il2CppClass (TypeInfo) pointers')
 	for d in jsonData['typeInfoPointers']:
-		DefineFieldFromJson(d)
+		try:
+  			DefineFieldFromJson(d)
+		except:
+			print("typeInfoPointers: An exception occurred")
 	
 	# Il2CppType (TypeRef) pointers
 	print('Processing Il2CppType (TypeRef) pointers')
 	for d in jsonData['typeRefPointers']:
-		DefineField(d['virtualAddress'], d['name'], r'struct Il2CppType *', d['dotNetType'])
+		try:
+			DefineField(d['virtualAddress'], d['name'], r'struct Il2CppType *', d['dotNetType'])
+		except:
+			print("typeRefPointers: An exception occurred")
 	
 	# MethodInfo pointers
 	print('Processing MethodInfo pointers')
 	for d in jsonData['methodInfoPointers']:
-		DefineILMethodInfo(d)
+		try:
+  			DefineILMethodInfo(d)
+		except:
+			print("methodInfoPointers: An exception occurred")
 
 	# Function boundaries
 	print('Processing function boundaries')
@@ -107,27 +135,43 @@ def ProcessJSON(jsonData):
 		addrNext = None
 		if i != count -1:
 			addrNext = int(functionAddresses[i+1],0)
-		MakeFunction(addrStart,None,addrNext)
+		try:
+  			MakeFunction(addrStart,None,addrNext)
+		except:
+			print("functionAddresses: An exception occurred")
+		
 
 	# IL2CPP type metadata
 	print('Processing IL2CPP type metadata')
 	for d in jsonData['typeMetadata']:
-		DefineField(d['virtualAddress'], d['name'], d['type'])
+		try:
+			DefineField(d['virtualAddress'], d['name'], d['type'])
+		except:
+			print("typeMetadata: An exception occurred")
 	
 	# IL2CPP function metadata
 	print('Processing IL2CPP function metadata')
 	for d in jsonData['functionMetadata']:
-		DefineCppFunction(d)
+		try:
+			DefineCppFunction(d)
+		except:
+			print("functionMetadata: An exception occurred")
 
 	# IL2CPP array metadata
 	print('Processing IL2CPP array metadata')
 	for d in jsonData['arrayMetadata']:
-		DefineArray(d)
+		try:
+			DefineArray(d)
+		except:
+			print("arrayMetadata: An exception occurred")
 
 	# IL2CPP API functions
 	print('Processing IL2CPP API functions')
 	for d in jsonData['apis']:
-		DefineCppFunction(d)
+		try:
+			DefineCppFunction(d)
+		except:
+			print("apis: An exception occurred")
 
 # Entry point
 print('Generated script file by Il2CppInspector - http://www.djkaty.com - https://github.com/djkaty')

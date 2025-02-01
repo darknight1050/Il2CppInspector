@@ -1,4 +1,4 @@
-﻿# Ghidra-specific implementation
+# Ghidra-specific implementation
 from ghidra.app.cmd.function import ApplyFunctionSignatureCmd
 from ghidra.app.util.cparser.C import CParserUtils
 from ghidra.program.model.data import ArrayDataType
@@ -25,11 +25,11 @@ class GhidraDisassemblerInterface(BaseDisassemblerInterface):
 		return getSourceFile().getParentFile().toString()
 
 	def on_start(self):
-		self.xrefs = currentProgram.getReferenceManager()
+		self.xrefs = currentProgram().getReferenceManager()
 
 		# Check that the user has parsed the C headers first
 		if len(getDataTypes('Il2CppObject')) == 0:
-			print('STOP! You must import the generated C header file (%TYPE_HEADER_RELATIVE_PATH%) before running this script.')
+			print('STOP! You must import the generated C header file (./il2cpp.h) before running this script.')
 			print('See https://github.com/djkaty/Il2CppInspector/blob/master/README.md#adding-metadata-to-your-ghidra-workflow for instructions.')
 			sys.exit()
 
@@ -38,11 +38,11 @@ class GhidraDisassemblerInterface(BaseDisassemblerInterface):
 		# Make sure that the base address is 0
 		# Without this, Ghidra may not analyze the binary correctly and you will just waste your time
 		# If 0 doesn't work for you, replace it with the base address from the output of the CLI or GUI
-		if currentProgram.getExecutableFormat().endswith('(ELF)'):
-			currentProgram.setImageBase(toAddr(0), True)
+		if currentProgram().getExecutableFormat().endswith('(ELF)'):
+			currentProgram().setImageBase(toAddr(0), True)
 		
 		# Don't trigger decompiler
-		setAnalysisOption(currentProgram, "Call Convention ID", "false")
+		setAnalysisOption(currentProgram(), "Call Convention ID", "false")
 
 	def on_finish(self):
 		pass
@@ -78,8 +78,9 @@ class GhidraDisassemblerInterface(BaseDisassemblerInterface):
 			print("Failed to set type: %s" % type)
 
 	def set_function_type(self, address: int, type: str):
-		typeSig = CParserUtils.parseSignature(DataTypeManagerService@None, currentProgram, type)
-		ApplyFunctionSignatureCmd(toAddr(address), typeSig, SourceType.USER_DEFINED, False, True).applyTo(currentProgram)
+		self.define_function(address)
+		typeSig = CParserUtils.parseSignature(None, currentProgram(), type, True)
+		ApplyFunctionSignatureCmd(toAddr(address), typeSig, SourceType.USER_DEFINED, False, True).applyTo(currentProgram())
 
 	def set_data_comment(self, address: int, cmt: str):
 		setEOLComment(toAddr(address), cmt)
@@ -99,7 +100,7 @@ class GhidraDisassemblerInterface(BaseDisassemblerInterface):
 			return
 		
 		cmd = DemanglerCmd(address, name)
-		if not cmd.applyTo(currentProgram, monitor):
+		if not cmd.applyTo(currentProgram(), monitor()):
 			print(f"Failed to apply demangled name to {name} at {address} due {cmd.getStatusMsg()}, falling back to mangled")
 			createLabel(address, name, True)
 
